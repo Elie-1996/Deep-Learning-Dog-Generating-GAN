@@ -6,7 +6,7 @@ from torchvision.utils import save_image
 
 def train_nn(discriminator, generator, training_loader, device):
     # define parameters
-    EPOCH = 10
+    EPOCH = 1000
     LR = 0.0001
     criterion = nn.BCELoss()
     optimizerD = optim.Adam(discriminator.parameters(), lr=LR*10, betas=(0.9, 0.999))
