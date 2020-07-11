@@ -1,0 +1,6 @@
+    EPOCH = 10
+    LR = 0.00001
+    criterion = nn.BCELoss()
+    optimizerD = optim.Adam(discriminator.parameters(), lr=LR*10, betas=(0.9, 0.999))
+    optimizerG = optim.Adam(generator.parameters(), lr=LR, betas=(0.9, 0.999))
+	BATCH_SIZE = 32

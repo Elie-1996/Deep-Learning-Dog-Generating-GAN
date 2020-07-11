@@ -1,15 +1,16 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from torchvision.utils import save_image
 
 
 def train_nn(discriminator, generator, training_loader, device):
     # define parameters
     EPOCH = 10
-    LR = 0.001
+    LR = 0.0001
     criterion = nn.BCELoss()
-    optimizerD = optim.Adam(discriminator.parameters(), lr=LR, betas=(0.5, 0.999))
-    optimizerG = optim.Adam(generator.parameters(), lr=LR, betas=(0.5, 0.999))
+    optimizerD = optim.Adam(discriminator.parameters(), lr=LR*10, betas=(0.9, 0.999))
+    optimizerG = optim.Adam(generator.parameters(), lr=LR, betas=(0.9, 0.999))
 
     # actual training
     train_nn_helper(generator, discriminator, training_loader, EPOCH, criterion, optimizerD, optimizerG, device)
@@ -49,13 +50,12 @@ def train_nn_helper(generator, discriminator, training_loader, EPOCH, criterion,
             errG.backward()
             optimizerG.step()
 
-
-            # # reshape the array to dimensions of: batch x width pixels x height pixels x RGB (for saving purposes)
-            # # real_image = real_image.numpy().transpose(0, 2, 3, 1)
-            # # 3rd Step: Printing the losses and saving the real images and the generated images of the minibatch every 100 steps
-            # print('[%d/%d][%d/%d] Loss_D: %.4f; Loss_G: %.4f' % (
-            # epoch, EPOCH, i, len(dataloader), errD.item(), errG.item()))
-            # if i % 100 == 0:
-            #     vutils.save_image(real_image, '%s/real_samples.png' % "./results", normalize=True)
-            #     fake = generator(noise)
-            #     vutils.save_image(fake.data, '%s/fake_samples_epoch_%03d.png' % ("./results", epoch), normalize=True)
+            # reshape the array to dimensions of: batch x width pixels x height pixels x RGB (for saving purposes)
+            # real_image = real_image.numpy().transpose(0, 2, 3, 1)
+            # 3rd Step: Printing the losses and saving the real images and the generated images of the minibatch every 100 steps
+            print('[%d/%d][%d/%d] Loss_D: %.4f; Loss_G: %.4f' % (
+            epoch, EPOCH, i, len(training_loader), errD.item(), errG.item()))
+            if i % 100 == 0:
+                save_image(real_image, '%s/real_samples.png' % "./results", normalize=True)
+                fake = generator(noise)
+                save_image(fake.data, '%s/fake_samples_epoch_%03d.png' % ("./results", epoch), normalize=True)

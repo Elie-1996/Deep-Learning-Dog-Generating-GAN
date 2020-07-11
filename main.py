@@ -4,12 +4,14 @@ import torch.tensor
 import PreProcessing
 from training import train_nn
 from NeuralNetwork import Generator, Discriminator, weights_init
+from time import time
 
 
 def main():
     print("I will generate dogs in the future :)")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(device)
+    torch.cuda.get_device_name()
 
     # initialize neural networks:
     generator = Generator().to(device)
