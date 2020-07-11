@@ -18,8 +18,4 @@ def load():
     data = datasets.ImageFolder(IMAGE_PATH, transform=transform)
     loader = torch.utils.data.DataLoader(data, shuffle=True, batch_size=BATCH_SIZE)
 
-    imgs, labels = next(iter(loader))
-    imgs = imgs.numpy().transpose(0, 2, 3, 1)
-    plt.imshow(imgs[0])
-    plt.show()
-    return imgs, labels
+    return loader
