@@ -11,14 +11,21 @@ import numpy as np
 import matplotlib.pyplot as plt
 from time import time
 
-# PATH = "/content/drive/My Drive/DoggosGAN/"  # Colab path
+PC_PATH = ""  # PC path
+DRIVE_PATH = "/content/drive/My Drive/DoggosGAN/"  # Colab path
 
-PATH = "data/"  # PC path
-IMAGE_PATH = PATH + "Images/"
+PATH = PC_PATH
+# PATH = DRIVE_PATH
+
+IMAGE_PATH = PATH + "data/Images/"
+RESULTS_PATH = PATH + "results/"
+SAVE_PATH = PATH + "save/state.pth"
 ANNOTATION_PATH = PATH + "Annotation/"
+
 BATCH_SIZE = 32
 EPOCH = 1000
-LR = 0.0001
+D_LR = 0.0001
+G_LR = 0.0005
 CRITERION = nn.BCELoss()
 
 
@@ -98,21 +105,31 @@ def main():
     print("I will generate dogs in the future :)")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(device)
-    torch.cuda.get_device_name()
+    # torch.cuda.get_device_name()
 
     # initialize neural networks:
     generator = Generator().to(device)
     generator.apply(weights_init)
-    optimizer_g = optim.Adam(generator.parameters(), lr=LR, betas=(0.9, 0.999))
+    optimizer_g = optim.Adam(generator.parameters(), lr=G_LR, betas=(0.9, 0.999))
 
     discriminator = Discriminator().to(device)
     discriminator.apply(weights_init)
-    optimizer_d = optim.Adam(discriminator.parameters(), lr=LR * 10, betas=(0.9, 0.999))
+    optimizer_d = optim.Adam(discriminator.parameters(), lr=D_LR * 10, betas=(0.9, 0.999))
 
+    if os.path.exists(SAVE_PATH):
+        checkpoint = torch.load(SAVE_PATH)
+        discriminator.load_state_dict(checkpoint['discriminator_state_dict'])
+        optimizer_d.load_state_dict(checkpoint['optimizer_d_state_dict'])
+
+        generator.load_state_dict(checkpoint['generator_state_dict'])
+        optimizer_g.load_state_dict(checkpoint['optimizer_g_state_dict'])
     # Load training data
     training_loader = load()
 
+    print("---------------------")
+    print("Starting training:")
     for epoch in range(EPOCH):
+
         for i, data in enumerate(training_loader):
             real_image_, _ = data
             real_image = real_image_.clone().detach().to(device)
@@ -132,7 +149,7 @@ def main():
             output = discriminator(fake.detach())
             err_d_fake = CRITERION(output, target)
 
-            # Backpropagating the total error
+            # Back-propagation of the total error
             err_d = err_d_real + err_d_fake
             err_d.backward()
             optimizer_d.step()
@@ -153,10 +170,21 @@ def main():
             print('[%d/%d][%d/%d] Loss_D: %.4f; Loss_G: %.4f' % (
                 epoch, EPOCH, i, len(training_loader), err_d.item(), err_g.item()))
             if i % 100 == 0:
-                save_image(real_image, '%s/real_samples.png' % "./results", normalize=True)
+                save_image(real_image, f"{RESULTS_PATH}real_samples.png", normalize=True)
                 fake = generator(noise)
-                save_image(fake.data, '%s/fake_samples_epoch_%03d.png' % ("./results", epoch), normalize=True)
+                save_image(fake.data, f"{RESULTS_PATH}fake_samples_epoch_{epoch}.png", normalize=True)
 
+        # Save models' states every 20 epochs
+        if epoch % 20 == 0:
+            torch.save({
+                # save discriminator state
+                'discriminator_state_dict': discriminator.state_dict(),
+                'optimizer_d_state_dict': optimizer_d.state_dict(),
+
+                # save generator state
+                'generator_state_dict': generator.state_dict(),
+                'optimizer_g_state_dict': optimizer_g.state_dict(),
+            }, SAVE_PATH)
 
 
 if __name__ == '__main__':
