@@ -5,6 +5,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torchvision import datasets, transforms
 from torchvision.utils import save_image
+from PIL.Image import BICUBIC
 
 import numpy as np
 
@@ -22,10 +23,14 @@ RESULTS_PATH = PATH + "results/"
 SAVE_PATH = PATH + "save/state.pth"
 ANNOTATION_PATH = PATH + "Annotation/"
 
-BATCH_SIZE = 32
+LOAD_NETWORK_PARAMETERS = False
+
+BATCH_SIZE = 64
 EPOCH = 1000
-D_LR = 0.0001
-G_LR = 0.0005
+D_LR = 0.0002
+G_LR = 0.0002
+BETA1 = 0.5
+BETA2 = 0.999
 CRITERION = nn.BCELoss()
 
 
@@ -33,6 +38,7 @@ def load():
     # Wanted 64X64 images
     transform = transforms.Compose([transforms.Resize(64),
                                     transforms.CenterCrop(64),
+                                    transforms.RandomRotation(10.0, resample=BICUBIC),
                                     transforms.ToTensor(),
                                     transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
 
@@ -48,13 +54,19 @@ class Generator(nn.Module):
 
         self.main = nn.Sequential(
             nn.ConvTranspose2d(100, 512, 4, stride=1, padding=0, bias=False),
-            nn.BatchNorm2d(512),
+            nn.BatchNorm2d(512),  # batch normalization
+            nn.ReLU(True),
+            nn.Dropout2d(p=0.5, inplace=False),
             nn.ReLU(True),
             nn.ConvTranspose2d(512, 256, 4, stride=2, padding=1, bias=False),
             nn.BatchNorm2d(256),
             nn.ReLU(True),
+            nn.Dropout2d(p=0.5, inplace=False),
+            nn.ReLU(True),
             nn.ConvTranspose2d(256, 128, 4, stride=2, padding=1, bias=False),
             nn.BatchNorm2d(128),
+            nn.ReLU(True),
+            nn.Dropout2d(p=0.5, inplace=False),
             nn.ReLU(True),
             nn.ConvTranspose2d(128, 64, 4, stride=2, padding=1, bias=False),
             nn.BatchNorm2d(64),
@@ -76,11 +88,17 @@ class Discriminator(nn.Module):
             nn.Conv2d(64, 128, 4, stride=2, padding=1, bias=False),
             nn.BatchNorm2d(128),
             nn.LeakyReLU(negative_slope=0.2, inplace=True),
+            nn.Dropout2d(p=0.5, inplace=False),
+            nn.LeakyReLU(negative_slope=0.2, inplace=True),
             nn.Conv2d(128, 256, 4, stride=2, padding=1, bias=False),
             nn.BatchNorm2d(256),
             nn.LeakyReLU(negative_slope=0.2, inplace=True),
+            nn.Dropout2d(p=0.5, inplace=False),
+            nn.LeakyReLU(negative_slope=0.2, inplace=True),
             nn.Conv2d(256, 512, 4, stride=2, padding=1, bias=False),
             nn.BatchNorm2d(512),
+            nn.LeakyReLU(negative_slope=0.2, inplace=True),
+            nn.Dropout2d(p=0.5, inplace=False),
             nn.LeakyReLU(negative_slope=0.2, inplace=True),
             nn.Conv2d(512, 1, 4, stride=1, padding=0, bias=False),
             nn.Sigmoid()
@@ -110,19 +128,24 @@ def main():
     # initialize neural networks:
     generator = Generator().to(device)
     generator.apply(weights_init)
-    optimizer_g = optim.Adam(generator.parameters(), lr=G_LR, betas=(0.9, 0.999))
+    optimizer_g = optim.Adam(generator.parameters(), lr=G_LR, betas=(BETA1, BETA2))
 
     discriminator = Discriminator().to(device)
     discriminator.apply(weights_init)
-    optimizer_d = optim.Adam(discriminator.parameters(), lr=D_LR * 10, betas=(0.9, 0.999))
+    optimizer_d = optim.Adam(discriminator.parameters(), lr=D_LR, betas=(BETA1, BETA2))
 
-    if os.path.exists(SAVE_PATH):
-        checkpoint = torch.load(SAVE_PATH)
-        discriminator.load_state_dict(checkpoint['discriminator_state_dict'])
-        optimizer_d.load_state_dict(checkpoint['optimizer_d_state_dict'])
+    if LOAD_NETWORK_PARAMETERS:
+        print("I am using loaded networks.")
+        if os.path.exists(SAVE_PATH):
+            checkpoint = torch.load(SAVE_PATH)
+            discriminator.load_state_dict(checkpoint['discriminator_state_dict'])
+            optimizer_d.load_state_dict(checkpoint['optimizer_d_state_dict'])
 
-        generator.load_state_dict(checkpoint['generator_state_dict'])
-        optimizer_g.load_state_dict(checkpoint['optimizer_g_state_dict'])
+            generator.load_state_dict(checkpoint['generator_state_dict'])
+            optimizer_g.load_state_dict(checkpoint['optimizer_g_state_dict'])
+    else:
+        print("I am using fresh networks.")
+
     # Load training data
     training_loader = load()
 
@@ -173,7 +196,6 @@ def main():
                 save_image(real_image, f"{RESULTS_PATH}real_samples.png", normalize=True)
                 fake = generator(noise)
                 save_image(fake.data, f"{RESULTS_PATH}fake_samples_epoch_{epoch}.png", normalize=True)
-
         # Save models' states every 20 epochs
         if epoch % 20 == 0:
             torch.save({
