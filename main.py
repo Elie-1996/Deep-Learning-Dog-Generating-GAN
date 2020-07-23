@@ -33,8 +33,12 @@ BETA1 = 0.5
 BETA2 = 0.999
 CRITERION = nn.BCELoss()
 
+# This is supposed to help training by setting a stochastic range around 0.9, instead of 1.0
+TRAINING_MAX_LABEL = 0.95
+TRAINING_MIN_LABEL = 0.85
 
-def load():
+
+def get_data():
     # Wanted 64X64 images
     transform = transforms.Compose([transforms.Resize(64),
                                     transforms.CenterCrop(64),
@@ -43,6 +47,11 @@ def load():
                                     transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
 
     data = datasets.ImageFolder(IMAGE_PATH, transform=transform)
+
+    return data
+
+
+def load_shuffle_data(data):
     loader = torch.utils.data.DataLoader(data, shuffle=True, batch_size=BATCH_SIZE)
 
     return loader
@@ -147,12 +156,14 @@ def main():
         print("I am using fresh networks.")
 
     # Load training data
-    training_loader = load()
+    image_data = get_data()
 
     print("---------------------")
     print("Starting training:")
     for epoch in range(EPOCH):
 
+        # shuffle data with each epoch
+        training_loader = load_shuffle_data(image_data)
         for i, data in enumerate(training_loader):
             real_image_, _ = data
             real_image = real_image_.clone().detach().to(device)
@@ -161,7 +172,7 @@ def main():
             discriminator.zero_grad()
 
             # Training the discriminator with a real image of the dataset
-            target = torch.ones(real_image.size()[0], device=device)
+            target = torch.rand(real_image.size()[0], device=device)*(TRAINING_MAX_LABEL - TRAINING_MIN_LABEL) + TRAINING_MIN_LABEL
             output = discriminator(real_image)
             err_d_real = CRITERION(output, target)
 
